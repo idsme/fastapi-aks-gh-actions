@@ -1,0 +1,47 @@
+name: Deploy FastAPI to AKS
+
+on:
+  push:
+    branches:
+      - main 
+
+env:
+  AZURE_RESOURCE_GROUP: "fastapi-resource-group"
+  AZURE_AKS_CLUSTER: "fastapi-aks-cluster"
+  ACR_NAME: "fastapiacr12345"
+  IMAGE_NAME: "fastapi-app"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds:   
+
+      - name: Build Docker Image
+        run: |
+          docker build -t $ACR_NAME.azurecr.io/$IMAGE_NAME:latest .
+
+      - name: Login to Azure Container Registry (ACR)
+        run: |
+          az acr login --name $ACR_NAME
+
+      - name: Push Docker Image to ACR
+        run: |
+          docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_AKS_CLUSTER
+
+      - name: Update Deployment in AKS
+        run: |
+          kubectl set image deployment/fastapi-app fastapi=$ACR_NAME.azurecr.io/$IMAGE_NAME:latest
+          kubectl rollout restart deployment fastapi-app
+          kubectl rollout status deployment/fastapi-app
