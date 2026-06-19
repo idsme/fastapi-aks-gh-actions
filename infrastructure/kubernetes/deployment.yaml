@@ -1,20 +1,20 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: fastapi-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: fastapi
-  template:
-    metadata:
-      labels:
-        app: fastapi
-    spec:
-      containers:
-      - name: fastapi
-        image: fastapiacr12345.azurecr.io/fastapi-app:latest
-        ports:
-        - containerPort: 8000
-        imagePullPolicy: Always
+apiVersion: apps/v1  # Use the stable apps/v1 API group which provides the Deployment resource
+kind: Deployment  # Declare this manifest as a Kubernetes Deployment resource
+metadata:  # Metadata block containing the resource's identifying information
+  name: fastapi-app  # Name of this Deployment resource within the Kubernetes namespace
+spec:  # Desired state specification that Kubernetes will continuously reconcile towards
+  replicas: 2  # Run two pod replicas simultaneously for basic high availability
+  selector:  # Label selector used by the Deployment to identify which pods it owns and manages
+    matchLabels:  # Pods must carry all of these labels to be owned by this Deployment
+      app: fastapi  # Match only pods with the label app=fastapi
+  template:  # Pod template used as the blueprint when creating each replica
+    metadata:  # Metadata applied to every pod created from this template
+      labels:  # Labels attached to each pod so both the Deployment and Service can select them
+        app: fastapi  # Label that ties pods to this Deployment and to the Service selector
+    spec:  # Runtime specification for the containers inside each pod
+      containers:  # List of containers that run together inside each pod
+      - name: fastapi  # Internal name for this container within the pod
+        image: fastapiacr12345.azurecr.io/fastapi-app:latest  # Full ACR image path — registry/name:tag — pulled on every pod start
+        ports:  # List of ports to expose from the container for networking
+        - containerPort: 8000  # The port uvicorn listens on inside the container
+        imagePullPolicy: Always  # Always pull the image from ACR on every pod start to ensure the latest version is used

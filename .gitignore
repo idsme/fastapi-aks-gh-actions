@@ -1,9 +1,10 @@
+# Virtual environment directories — excluded to avoid committing local Python environments
 venv/
-__pycache__/
-*.pyc
-.env
-.terraform/
-*.tfstate
-*.tfstate.backup
-.venv
-venv
+__pycache__/  # Python bytecode cache directory — auto-generated at runtime, not needed in version control
+*.pyc  # Compiled Python bytecode files — platform-specific and automatically regenerated
+.env  # Local environment variables file — often contains secrets and must never be committed
+.terraform/  # Terraform provider cache and lock files — machine-specific, generated on terraform init
+*.tfstate  # Terraform state files — track real infrastructure state; conflict-prone if committed
+*.tfstate.backup  # Terraform state backup files — created automatically by Terraform during apply operations
+.venv  # Alternate virtual environment directory name used by some Python tooling
+venv  # Bare venv pattern without trailing slash to catch all naming variants

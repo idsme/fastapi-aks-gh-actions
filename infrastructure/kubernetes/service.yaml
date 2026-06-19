@@ -1,12 +1,12 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: fastapi-service
-spec:
-  selector:
-    app: fastapi
-  ports:
-  - protocol: TCP
-    port: 80         
-    targetPort: 8000  
-  type: LoadBalancer
+apiVersion: v1  # Use the core v1 API group which provides the Service resource
+kind: Service  # Declare this manifest as a Kubernetes Service resource
+metadata:  # Metadata block containing the resource's identifying information
+  name: fastapi-service  # Name of this Service resource within the Kubernetes namespace
+spec:  # Desired state specification for how the Service routes and exposes traffic
+  selector:  # Label selector that identifies which pods this Service sends traffic to
+    app: fastapi  # Route traffic only to pods carrying the label app=fastapi
+  ports:  # List of port mappings that define how traffic flows through the Service
+  - protocol: TCP  # Use the TCP network protocol for this port mapping
+    port: 80  # External port that clients and the Azure load balancer listen on
+    targetPort: 8000  # Internal container port that incoming traffic is forwarded to
+  type: LoadBalancer  # Provision an Azure public load balancer to expose the Service to the internet
