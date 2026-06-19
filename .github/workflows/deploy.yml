@@ -1,47 +1,47 @@
-name: Deploy FastAPI to AKS
+name: Deploy FastAPI to AKS  # Display name for this workflow shown in the GitHub Actions UI
 
-on:
-  push:
-    branches:
-      - main 
+on:  # Define the events that trigger this workflow
+  push:  # Trigger the workflow on push events
+    branches:  # Restrict triggering to specific branches only
+      - main  # Only run this workflow when code is pushed to the main branch
 
-env:
-  AZURE_RESOURCE_GROUP: "fastapi-resource-group"
-  AZURE_AKS_CLUSTER: "fastapi-aks-cluster"
-  ACR_NAME: "fastapiacr12345"
-  IMAGE_NAME: "fastapi-app"
+env:  # Define workflow-level environment variables reused across all steps
+  AZURE_RESOURCE_GROUP: "fastapi-resource-group"  # Azure resource group that contains all project resources
+  AZURE_AKS_CLUSTER: "fastapi-aks-cluster"  # Name of the AKS cluster to deploy the application to
+  ACR_NAME: "fastapiacr12345"  # Name of the Azure Container Registry that stores the Docker images
+  IMAGE_NAME: "fastapi-app"  # Name of the Docker image to build and push
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+jobs:  # Define the jobs that run as part of this workflow
+  build-and-deploy:  # Job identifier: builds the image and deploys it to AKS
+    runs-on: ubuntu-latest  # Run this job on a GitHub-hosted Ubuntu virtual machine
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    steps:  # Ordered list of steps to execute sequentially in this job
+      - name: Checkout Repository  # Step: pull the repository source code onto the runner
+        uses: actions/checkout@v4  # Use the official GitHub checkout action to clone the repo
 
-      - name: Login to Azure
-        uses: azure/login@v2
+      - name: Login to Azure  # Step: authenticate with Azure so subsequent az CLI commands work
+        uses: azure/login@v2  # Use the official Azure login action
         with:
-          creds:   
+          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Azure service principal credentials stored as a GitHub secret
 
-      - name: Build Docker Image
+      - name: Build Docker Image  # Step: build the container image from the Dockerfile in the repo root
         run: |
-          docker build -t $ACR_NAME.azurecr.io/$IMAGE_NAME:latest .
+          docker build -t $ACR_NAME.azurecr.io/$IMAGE_NAME:latest .  # Build and tag the image with the full ACR registry path and latest tag
 
-      - name: Login to Azure Container Registry (ACR)
+      - name: Login to Azure Container Registry (ACR)  # Step: authenticate Docker with ACR so it can push images
         run: |
-          az acr login --name $ACR_NAME
+          az acr login --name $ACR_NAME  # Use the Azure CLI to log Docker into the specified ACR registry
 
-      - name: Push Docker Image to ACR
+      - name: Push Docker Image to ACR  # Step: upload the locally built image to the Azure Container Registry
         run: |
-          docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest
+          docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Push the tagged image to ACR for storage and later deployment
 
-      - name: Get AKS Credentials
+      - name: Get AKS Credentials  # Step: download kubeconfig so kubectl can connect to the AKS cluster
         run: |
-          az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_AKS_CLUSTER
+          az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_AKS_CLUSTER  # Merge AKS cluster credentials into the runner's local kubeconfig file
 
-      - name: Update Deployment in AKS
+      - name: Update Deployment in AKS  # Step: roll out the newly pushed image to the running Kubernetes deployment
         run: |
-          kubectl set image deployment/fastapi-app fastapi=$ACR_NAME.azurecr.io/$IMAGE_NAME:latest
-          kubectl rollout restart deployment fastapi-app
-          kubectl rollout status deployment/fastapi-app
+          kubectl set image deployment/fastapi-app fastapi=$ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Update the container image reference in the Kubernetes Deployment resource
+          kubectl rollout restart deployment fastapi-app  # Force a rolling restart so all pods pick up the new image
+          kubectl rollout status deployment/fastapi-app  # Block and wait until the rollout completes successfully, failing the step on error
