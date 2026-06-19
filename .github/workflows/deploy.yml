@@ -1,4 +1,4 @@
-name: Deploy FastAPI to AKS  # Display name for this workflow shown in the GitHub Actions UI
+name: Deploy FastAPI to MedionK3s  # Display name for this workflow shown in the GitHub Actions UI
 
 on:  # Define the events that trigger this workflow
   push:  # Trigger the workflow on push events
@@ -6,13 +6,12 @@ on:  # Define the events that trigger this workflow
       - main  # Only run this workflow when code is pushed to the main branch
 
 env:  # Define workflow-level environment variables reused across all steps
-  AZURE_RESOURCE_GROUP: "fastapi-resource-group"  # Azure resource group that contains all project resources
-  AZURE_AKS_CLUSTER: "fastapi-aks-cluster"  # Name of the AKS cluster to deploy the application to
+  AZURE_RESOURCE_GROUP: "fastapi-resource-group"  # Azure resource group that contains the container registry
   ACR_NAME: "fastapiacr12345"  # Name of the Azure Container Registry that stores the Docker images
   IMAGE_NAME: "fastapi-app"  # Name of the Docker image to build and push
 
 jobs:  # Define the jobs that run as part of this workflow
-  build-and-deploy:  # Job identifier: builds the image and deploys it to AKS
+  build-and-deploy:  # Job identifier: builds the image and deploys it to MedionK3s
     runs-on: ubuntu-latest  # Run this job on a GitHub-hosted Ubuntu virtual machine
 
     steps:  # Ordered list of steps to execute sequentially in this job
@@ -36,12 +35,14 @@ jobs:  # Define the jobs that run as part of this workflow
         run: |
           docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Push the tagged image to ACR for storage and later deployment
 
-      - name: Get AKS Credentials  # Step: download kubeconfig so kubectl can connect to the AKS cluster
+      - name: Configure kubectl for MedionK3s  # Step: write the cluster kubeconfig so kubectl can reach MedionK3s
         run: |
-          az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_AKS_CLUSTER  # Merge AKS cluster credentials into the runner's local kubeconfig file
+          mkdir -p ~/.kube  # Create the kubectl config directory if it does not exist
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config  # Decode the base64-encoded kubeconfig stored as a GitHub secret and write it to disk
+          chmod 600 ~/.kube/config  # Restrict file permissions so only the current user can read the kubeconfig
 
-      - name: Update Deployment in AKS  # Step: roll out the newly pushed image to the running Kubernetes deployment
+      - name: Deploy to MedionK3s  # Step: roll out the newly pushed image to the running Kubernetes deployment
         run: |
           kubectl set image deployment/fastapi-app fastapi=$ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Update the container image reference in the Kubernetes Deployment resource
-          kubectl rollout restart deployment fastapi-app  # Force a rolling restart so all pods pick up the new image
+          kubectl rollout restart deployment fastapi-app  # Force a rolling restart so all pods pull the new image
           kubectl rollout status deployment/fastapi-app  # Block and wait until the rollout completes successfully, failing the step on error

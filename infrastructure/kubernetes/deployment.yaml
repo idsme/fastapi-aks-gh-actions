@@ -12,6 +12,8 @@ spec:  # Desired state specification that Kubernetes will continuously reconcile
       labels:  # Labels attached to each pod so both the Deployment and Service can select them
         app: fastapi  # Label that ties pods to this Deployment and to the Service selector
     spec:  # Runtime specification for the containers inside each pod
+      imagePullSecrets:  # List of secrets used to authenticate with the container registry
+      - name: acr-secret  # References a Kubernetes secret holding ACR credentials (create with: kubectl create secret docker-registry acr-secret --docker-server=fastapiacr12345.azurecr.io --docker-username=fastapiacr12345 --docker-password=<ACR_ADMIN_PASSWORD>)
       containers:  # List of containers that run together inside each pod
       - name: fastapi  # Internal name for this container within the pod
         image: fastapiacr12345.azurecr.io/fastapi-app:latest  # Full ACR image path — registry/name:tag — pulled on every pod start

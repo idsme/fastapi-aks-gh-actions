@@ -13,28 +13,9 @@ resource "azurerm_container_registry" "acr" {                      # Create an A
   resource_group_name = azurerm_resource_group.fastapi_rg.name     # Place the ACR inside the project resource group
   location            = azurerm_resource_group.fastapi_rg.location # Deploy ACR in the same Azure region as the resource group
   sku                 = "Basic"                                    # Use the Basic SKU — lowest cost tier, sufficient for development workloads
-  admin_enabled       = true                                       # Enable admin credentials so Docker CLI can authenticate using username and password
+  admin_enabled       = true                                       # Enable admin credentials so MedionK3s can pull images using an imagePullSecret
 }
 
-resource "azurerm_kubernetes_cluster" "fastapi_aks" {              # Create the AKS managed Kubernetes cluster to run application workloads
-  name                = "fastapi-aks-cluster"                      # Name of the AKS cluster as it appears in Azure
-  location            = azurerm_resource_group.fastapi_rg.location # Deploy the cluster in the same region as the resource group
-  resource_group_name = azurerm_resource_group.fastapi_rg.name     # Place the cluster inside the project resource group
-  dns_prefix          = "fastapi"                                  # DNS prefix used to build the cluster API server's public hostname
-
-  default_node_pool {              # Define the primary pool of virtual machines that run the Kubernetes worker nodes
-    name       = "default"         # Internal name of the default node pool
-    node_count = 2                 # Provision two nodes to provide basic redundancy and workload distribution
-    vm_size    = "Standard_DS2_v2" # VM size per node: 2 vCPUs and 7 GB RAM — balanced for small workloads
-  }
-
-  identity {                # Configure the managed identity used by the cluster to interact with Azure services
-    type = "SystemAssigned" # Use a system-assigned managed identity automatically created and managed by Azure
-  }
-}
-
-resource "azurerm_role_assignment" "aks_acr_pull" {                                           # Grant the AKS cluster permission to pull images from the ACR
-  principal_id         = azurerm_kubernetes_cluster.fastapi_aks.kubelet_identity[0].object_id # The managed identity of the AKS node pool (kubelet) that pulls container images
-  role_definition_name = "AcrPull"                                                            # Built-in Azure role that allows reading and pulling images from a container registry
-  scope                = azurerm_container_registry.acr.id                                    # Limit this role assignment to only the project ACR resource
-}
+# NOTE: The Kubernetes cluster (MedionK3s) is pre-existing and not managed by Terraform.
+# ACR pull access for MedionK3s is handled via a Kubernetes imagePullSecret (see deployment.yaml)
+# rather than an Azure role assignment, since MedionK3s is a K3s cluster without an AKS managed identity.
