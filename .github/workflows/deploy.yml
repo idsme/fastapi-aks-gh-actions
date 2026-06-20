@@ -6,11 +6,10 @@ on:  # Define the events that trigger this workflow
       - main  # Only run this workflow when code is pushed to the main branch
 
 env:  # Define workflow-level environment variables reused across all steps
-  AZURE_RESOURCE_GROUP: "fastapi-resource-group"  # Azure resource group that contains the container registry
-  ARC_RESOURCE_GROUP: "arcDemo"                   # Azure resource group that holds the Arc cluster registration
-  ARC_CLUSTER_NAME: "medionK3s"                   # Name of the Arc-connected cluster in Azure
-  ACR_NAME: "fastapiacr12345"                     # Name of the Azure Container Registry that stores the Docker images
-  IMAGE_NAME: "fastapi-app"                       # Name of the Docker image to build and push
+  ARC_RESOURCE_GROUP: "arcDemo"          # Azure resource group holding both the Arc cluster and the container registry
+  ARC_CLUSTER_NAME: "medionK3s"          # Name of the Arc-connected cluster in Azure
+  ACR_NAME: "acrakstraineeidsme"         # Name of the Azure Container Registry that stores the Docker images
+  IMAGE_NAME: "fastapi-app"              # Name of the Docker image to build and push
 
 jobs:  # Define the jobs that run as part of this workflow
   build-and-deploy:  # Job identifier: builds the image and deploys it to MedionK3s

@@ -16,7 +16,7 @@ spec:  # Desired state specification that Kubernetes will continuously reconcile
       - name: acr-secret  # References a Kubernetes secret holding ACR credentials (create with: kubectl create secret docker-registry acr-secret --docker-server=fastapiacr12345.azurecr.io --docker-username=fastapiacr12345 --docker-password=<ACR_ADMIN_PASSWORD>)
       containers:  # List of containers that run together inside each pod
       - name: fastapi  # Internal name for this container within the pod
-        image: fastapiacr12345.azurecr.io/fastapi-app:latest  # Full ACR image path — registry/name:tag — pulled on every pod start
+        image: acrakstraineeidsme.azurecr.io/fastapi-app:latest  # Full ACR image path — registry/name:tag — pulled on every pod start
         ports:  # List of ports to expose from the container for networking
         - containerPort: 8000  # The port uvicorn listens on inside the container
         imagePullPolicy: Always  # Always pull the image from ACR on every pod start to ensure the latest version is used

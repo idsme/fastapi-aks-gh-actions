@@ -40,10 +40,22 @@ resource "azurerm_arc_kubernetes_cluster" "medion_k3s" {
   }
 }
 
+resource "azurerm_container_registry" "acr" {                    # Import of the existing ACR used to store FastAPI Docker images
+  name                = "acrakstraineeidsme"                     # Globally unique registry name — login server: acrakstraineeidsme.azurecr.io
+  resource_group_name = azurerm_resource_group.arc_demo.name     # Co-located in arcDemo alongside the Arc cluster
+  location            = azurerm_resource_group.arc_demo.location # northeurope — matches the resource group region
+  sku                 = "Basic"                                  # Basic SKU — lowest cost tier, sufficient for this workload
+  admin_enabled       = true                                     # Admin credentials enabled so MedionK3s can pull images via imagePullSecret
+}
+
 # ============================================================
-# Read-only reference outputs — useful for wiring other resources
-# to this Arc cluster without hardcoding IDs.
+# Outputs — wire other resources or scripts without hardcoding IDs
 # ============================================================
+
+output "acr_login_server" {
+  description = "ACR login server hostname used in image tags and imagePullSecret"
+  value       = azurerm_container_registry.acr.login_server
+}
 
 output "arc_cluster_id" {
   description = "Full Azure resource ID of the Arc-connected MedionK3s cluster"
@@ -51,6 +63,6 @@ output "arc_cluster_id" {
 }
 
 output "arc_cluster_identity_principal_id" {
-  description = "Object ID of the system-assigned managed identity for the Arc cluster (eb2f3753-c092-4267-bcc2-0f8146155511)"
+  description = "Object ID of the system-assigned managed identity for the Arc cluster"
   value       = azurerm_arc_kubernetes_cluster.medion_k3s.identity[0].principal_id
 }
