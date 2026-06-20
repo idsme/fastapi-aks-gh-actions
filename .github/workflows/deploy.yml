@@ -7,8 +7,10 @@ on:  # Define the events that trigger this workflow
 
 env:  # Define workflow-level environment variables reused across all steps
   AZURE_RESOURCE_GROUP: "fastapi-resource-group"  # Azure resource group that contains the container registry
-  ACR_NAME: "fastapiacr12345"  # Name of the Azure Container Registry that stores the Docker images
-  IMAGE_NAME: "fastapi-app"  # Name of the Docker image to build and push
+  ARC_RESOURCE_GROUP: "arcDemo"                   # Azure resource group that holds the Arc cluster registration
+  ARC_CLUSTER_NAME: "medionK3s"                   # Name of the Arc-connected cluster in Azure
+  ACR_NAME: "fastapiacr12345"                     # Name of the Azure Container Registry that stores the Docker images
+  IMAGE_NAME: "fastapi-app"                       # Name of the Docker image to build and push
 
 jobs:  # Define the jobs that run as part of this workflow
   build-and-deploy:  # Job identifier: builds the image and deploys it to MedionK3s
@@ -18,10 +20,10 @@ jobs:  # Define the jobs that run as part of this workflow
       - name: Checkout Repository  # Step: pull the repository source code onto the runner
         uses: actions/checkout@v4  # Use the official GitHub checkout action to clone the repo
 
-      - name: Login to Azure  # Step: authenticate with Azure so subsequent az CLI commands work
+      - name: Login to Azure  # Step: authenticate with Azure using the service principal stored as a secret
         uses: azure/login@v2  # Use the official Azure login action
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Azure service principal credentials stored as a GitHub secret
+          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Azure service principal credentials (clientId, clientSecret, tenantId, subscriptionId)
 
       - name: Build Docker Image  # Step: build the container image from the Dockerfile in the repo root
         run: |
@@ -35,11 +37,13 @@ jobs:  # Define the jobs that run as part of this workflow
         run: |
           docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Push the tagged image to ACR for storage and later deployment
 
-      - name: Configure kubectl for MedionK3s  # Step: write the cluster kubeconfig so kubectl can reach MedionK3s
-        run: |
-          mkdir -p ~/.kube  # Create the kubectl config directory if it does not exist
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config  # Decode the base64-encoded kubeconfig stored as a GitHub secret and write it to disk
-          chmod 600 ~/.kube/config  # Restrict file permissions so only the current user can read the kubeconfig
+      - name: Set kubectl context via Azure Arc  # Step: configure kubectl to reach MedionK3s through the Arc cluster-connect tunnel
+        uses: azure/k8s-set-context@v4  # Official action that supports Arc-enabled clusters — no raw kubeconfig secret needed
+        with:
+          method: arc  # Use Azure Arc as the connection method instead of a stored kubeconfig
+          cluster-type: arc  # Tells the action this is an Arc-connected cluster (not AKS or generic kubeconfig)
+          cluster-name: ${{ env.ARC_CLUSTER_NAME }}  # Arc cluster name as registered in Azure
+          resource-group: ${{ env.ARC_RESOURCE_GROUP }}  # Resource group where the Arc registration lives
 
       - name: Deploy to MedionK3s  # Step: roll out the newly pushed image to the running Kubernetes deployment
         run: |
