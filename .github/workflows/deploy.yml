@@ -24,17 +24,27 @@ jobs:  # Define the jobs that run as part of this workflow
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}  # Azure service principal credentials (clientId, clientSecret, tenantId, subscriptionId)
 
-      - name: Build Docker Image  # Step: build the container image from the Dockerfile in the repo root
+      - name: Build Docker Image  # Step: build the image and tag it with both the short SHA and latest
         run: |
-          docker build -t $ACR_NAME.azurecr.io/$IMAGE_NAME:latest .  # Build and tag the image with the full ACR registry path and latest tag
+          SHORT_SHA=${GITHUB_SHA::8}  # Take the first 8 characters of the commit SHA as a short readable tag
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)  # Capture the current UTC time as the build timestamp
+          docker build \
+            --build-arg GIT_SHA=$GITHUB_SHA \        # Inject full commit SHA into the image for /version endpoint
+            --build-arg BUILD_TIME=$BUILD_TIME \     # Inject build timestamp into the image for /version endpoint
+            --build-arg IMAGE_TAG=$SHORT_SHA \       # Inject short SHA tag into the image for /version endpoint
+            -t $ACR_NAME.azurecr.io/$IMAGE_NAME:$SHORT_SHA \  # Tag with short SHA so each build is uniquely identifiable in ACR
+            -t $ACR_NAME.azurecr.io/$IMAGE_NAME:latest \      # Also tag as latest so the deployment always has a stable reference
+            .
+          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV  # Export SHORT_SHA so subsequent steps can reference it
 
       - name: Login to Azure Container Registry (ACR)  # Step: authenticate Docker with ACR so it can push images
         run: |
           az acr login --name $ACR_NAME  # Use the Azure CLI to log Docker into the specified ACR registry
 
-      - name: Push Docker Image to ACR  # Step: upload the locally built image to the Azure Container Registry
+      - name: Push Docker Image to ACR  # Step: push both tags so ACR stores the versioned and latest images
         run: |
-          docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Push the tagged image to ACR for storage and later deployment
+          docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:$SHORT_SHA  # Push the SHA-tagged image — permanent, traceable to this exact commit
+          docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:latest       # Push the latest tag — always points to the most recent build
 
       - name: Set kubectl context via Azure Arc  # Step: configure kubectl to reach MedionK3s through the Arc cluster-connect tunnel
         uses: azure/k8s-set-context@v4  # Official action that supports Arc-enabled clusters — no raw kubeconfig secret needed
@@ -44,8 +54,8 @@ jobs:  # Define the jobs that run as part of this workflow
           cluster-name: ${{ env.ARC_CLUSTER_NAME }}  # Arc cluster name as registered in Azure
           resource-group: ${{ env.ARC_RESOURCE_GROUP }}  # Resource group where the Arc registration lives
 
-      - name: Deploy to MedionK3s  # Step: roll out the newly pushed image to the running Kubernetes deployment
+      - name: Deploy to MedionK3s  # Step: roll out the SHA-tagged image to guarantee the exact commit is deployed
         run: |
-          kubectl set image deployment/fastapi-app fastapi=$ACR_NAME.azurecr.io/$IMAGE_NAME:latest  # Update the container image reference in the Kubernetes Deployment resource
-          kubectl rollout restart deployment fastapi-app  # Force a rolling restart so all pods pull the new image
-          kubectl rollout status deployment/fastapi-app  # Block and wait until the rollout completes successfully, failing the step on error
+          kubectl set image deployment/fastapi-app fastapi=$ACR_NAME.azurecr.io/$IMAGE_NAME:$SHORT_SHA  # Pin to the SHA tag — ensures this exact build is deployed, not whatever latest resolves to
+          kubectl rollout restart deployment fastapi-app   # Force a rolling restart so all pods pull the new image
+          kubectl rollout status deployment/fastapi-app   # Block and wait until the rollout completes successfully, failing the step on error
